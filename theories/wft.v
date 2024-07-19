@@ -16,7 +16,7 @@ Import ListNotations.
 #[global] Notation "↓ φ" := (λ n, φ (S n)) (at level 0, right associativity, format "↓ φ").
 #[global] Notation "a ⋅ φ" := (λ n, match n with 0 => a | S n => φ n end) (at level 0, right associativity, format "a ⋅ φ").
 
-#[global] Reserved Notation "t ⁺¹" (at level 1, left associativity, format "t ⁺¹").
+#[global] Reserved Notation "ω ⁺¹" (at level 1, left associativity, format "ω ⁺¹").
 #[global] Reserved Notation "φ ↗ t " (at level 2, no associativity, format "φ ↗ t").
 
 Section WFT_tools.
@@ -38,7 +38,7 @@ Section WFT_tools.
     | leaf   => 0
     | node ρ => 1 + ↓φ↗(ρ (φ 0))
     end
-  where "φ ↗ t" := (WFT_ht φ t).
+  where "φ ↗ ω" := (WFT_ht φ ω).
 
   Definition ω₁ : WFT := node (λ _, leaf).
 
@@ -50,7 +50,7 @@ Section WFT_tools.
     | leaf   => ω₁
     | node ρ => node (λ a, (ρ a)⁺¹)
     end
-  where "t ⁺¹" := (WFT_lift t).
+  where "ω ⁺¹" := (WFT_lift ω).
 
   Fact WFT_lift_ht φ ω : φ↗ω⁺¹ = 1 + φ↗ω.
   Proof. induction ω in φ |- *; simpl; auto. Qed.
@@ -63,16 +63,16 @@ Section WFT_tools.
     | node ρ => λ l, l = [] ∨ ∃ x l', l = l'++[x] ∧ stump (ρ x) l'
     end.
 
-  Fixpoint pfx_rev φ n :=
+  Local Fixpoint pfx_rev φ n :=
     match n with
     | 0   => []
     | S n => φ n :: pfx_rev φ n
     end.
 
-  Fact pfx_rev_plus φ n m : pfx_rev φ (n+m) = pfx_rev (λ i, φ (m+i)) n ++ pfx_rev φ m.
+  Local Fact pfx_rev_plus φ n m : pfx_rev φ (n+m) = pfx_rev (λ i, φ (m+i)) n ++ pfx_rev φ m.
   Proof. induction n; simpl; do 2 f_equal; auto; lia. Qed.
 
-  Fact pfx_rev_S φ n : pfx_rev φ (S n) = pfx_rev ↓φ n ++ [φ 0].
+  Local Fact pfx_rev_S φ n : pfx_rev φ (S n) = pfx_rev ↓φ n ++ [φ 0].
   Proof.
     replace (S n) with (n+1) by lia.
     now rewrite pfx_rev_plus.
@@ -93,9 +93,17 @@ Section WFT_tools.
         apply IH in H; lia.
   Qed.
 
+  Inductive lt_WFT : WFT → WFT → Prop :=
+    | lt_WFT_intro ρ a : lt_WFT (ρ a) (node ρ).
+
+  Fact lt_WFT_well_founded : well_founded lt_WFT.
+  Proof. intros t; induction t; constructor; inversion 1; trivial. Qed.
+
 End WFT_tools.
 
 Arguments leaf {X}.
 Arguments node {X} _.
 
+#[global] Notation "φ ↗ ω" := (WFT_ht φ ω).
+#[global] Notation "ω ⁺¹" := (WFT_lift ω).
 
