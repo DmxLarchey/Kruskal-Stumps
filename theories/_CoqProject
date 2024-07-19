@@ -1,0 +1,5 @@
+-R . KruskalStumps
+
+wft.v
+stumps_prop.v
+stumps_type.v
