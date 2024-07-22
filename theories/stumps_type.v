@@ -43,13 +43,13 @@ Section af_secure_Type.
 
         good R [φₙ₋₁;...;φ₀] ↔ ∃ i < j < n, R φᵢ φⱼ *)
 
-  Local Remark good_vs_good_pairs R φ n : good R (pfx_rev φ n) ↔ ∃ i j, i < j < n ∧ R (φ i) (φ j).
+  Local Remark good_vs_good_pairs R φ n : good R ⟨φ|n⟩ ↔ ∃ i j, i < j < n ∧ R (φ i) (φ j).
   Proof. apply good_pfx_rev. Qed.
 
   Definition afₛ_secures R ω := ∀φ, ∃ i j, i < j < φ↗ω ∧ R (φ i) (φ j).
 
   (* We need to generalize the following way to get af_secures → afₛ_secures below *)
-  Lemma af_secures_good R ω l φ : af_secures (R⇈l) ω → good R (pfx_rev φ φ↗ω⁺¹⁺¹ ++ l).
+  Lemma af_secures_good R ω l φ : af_secures (R⇈l) ω → good R (⟨φ|φ↗ω⁺¹⁺¹⟩ ++ l).
   Proof.
     induction ω as [ | ρ IH ] in l, φ |- *; intros H.
     + simpl.
@@ -71,7 +71,7 @@ Section af_secure_Type.
   Qed.
 
   (* We need to generalize the following way to get afₛ_secures → af_secures below *)
-  Lemma good_af_secures R ω l : (∀φ, good R (pfx_rev φ φ↗ω ++ l)) → af_secures (R⇈l) ω⁺¹.
+  Lemma good_af_secures R ω l : (∀φ, good R (⟨φ|φ↗ω⟩ ++ l)) → af_secures (R⇈l) ω⁺¹.
   Proof.
     induction ω as [ | ρ IH ] in l |- *; intros H.
     + simpl in H; left; apply rel_lift_rel_iff_good; left; auto.

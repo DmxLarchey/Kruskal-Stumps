@@ -19,6 +19,38 @@ Import ListNotations.
 #[global] Reserved Notation "ω ⁺¹" (at level 1, left associativity, format "ω ⁺¹").
 #[global] Reserved Notation "φ ↗ t " (at level 2, no associativity, format "φ ↗ t").
 
+#[global] Reserved Notation "⟨ φ | n ⟩" (at level 0, no associativity, format "⟨ φ | n ⟩").
+
+Section pfx_rev.
+
+  Variables (X : Type).
+
+  Implicit Type (φ : nat → X).
+
+  (* ⟨φ|n⟩ = [φₙ₋₁;...;φ₀] *)
+
+  Fixpoint pfx_rev φ n :=
+    match n with
+    | 0   => []
+    | S n => φ n :: ⟨φ|n⟩
+    end
+  where "⟨ φ | n ⟩" := (pfx_rev φ n).
+
+  Fact pfx_rev_plus φ n m : ⟨φ|n+m⟩ = ⟨λ i, φ (m+i)|n⟩ ++ ⟨φ|m⟩.
+  Proof. induction n; simpl; do 2 f_equal; auto; lia. Qed.
+
+  Fact pfx_rev_S φ n : ⟨φ|S n⟩ = ⟨↓φ|n⟩ ++ [φ 0].
+  Proof.
+    replace (S n) with (n+1) by lia.
+    now rewrite pfx_rev_plus.
+  Qed.
+
+End pfx_rev.
+
+Arguments pfx_rev {X}.
+
+#[global] Notation "⟨ φ | n ⟩" := (pfx_rev φ n).
+
 Section WFT_tools.
 
   (** Infinitely branching well founded trees *)
@@ -63,24 +95,9 @@ Section WFT_tools.
     | node ρ => λ l, l = [] ∨ ∃ x l', l = l'++[x] ∧ stump (ρ x) l'
     end.
 
-  Local Fixpoint pfx_rev φ n :=
-    match n with
-    | 0   => []
-    | S n => φ n :: pfx_rev φ n
-    end.
-
-  Local Fact pfx_rev_plus φ n m : pfx_rev φ (n+m) = pfx_rev (λ i, φ (m+i)) n ++ pfx_rev φ m.
-  Proof. induction n; simpl; do 2 f_equal; auto; lia. Qed.
-
-  Local Fact pfx_rev_S φ n : pfx_rev φ (S n) = pfx_rev ↓φ n ++ [φ 0].
-  Proof.
-    replace (S n) with (n+1) by lia.
-    now rewrite pfx_rev_plus.
-  Qed.
-
   (** The height of an infinite branch is larger that the length of 
       its prefixes that also belong to the stump *)
-  Fact stump_ht ω φ n : stump ω (pfx_rev φ n) → n < φ↗ω.
+  Fact stump_ht ω φ n : stump ω ⟨φ|n⟩ → n < φ↗ω.
   Proof.
     induction ω as [ | ρ IH ] in φ, n |- *; simpl.
     + easy.

@@ -62,7 +62,7 @@ Section af_secure.
   Fact bar_secures_mono P Q : P ⊆₁ Q → bar_secures P ⊆₂ bar_secures Q.
   Proof. intros ? l w; induction w in l |- *; simpl; auto. Qed.
 
-  Local Remark good_vs_good_pairs R φ n : good R (pfx_rev φ n) ↔ ∃ i j, i < j < n ∧ R (φ i) (φ j).
+  Local Remark good_vs_good_pairs R φ n : good R ⟨φ|n⟩ ↔ ∃ i j, i < j < n ∧ R (φ i) (φ j).
   Proof. apply good_pfx_rev. Qed.
 
   Fact bar_secures_lift_snoc R x l ω : bar_secures (good R↑x) l ω → bar_secures (good R) (l++[x]) ω.
@@ -82,14 +82,14 @@ Section af_secure.
     apply good_rel_lift_rev.
   Qed.
 
-  Fact bar_secures_bound P l ω φ : bar_secures P l ω → P (pfx_rev φ φ↗ω ++ l).
+  Fact bar_secures_bound P l ω φ : bar_secures P l ω → P (⟨φ|φ↗ω⟩ ++ l).
   Proof.
     induction ω as [ | ρ IH ] in l, φ |- *; intros HP; auto.
     simpl WFT_ht; rewrite pfx_rev_S, app_ass.
     apply IH, HP.
   Qed.
 
-  Fact bar_secures_nil_bound P ω φ : bar_secures P [] ω → P (pfx_rev φ φ↗ω).
+  Fact bar_secures_nil_bound P ω φ : bar_secures P [] ω → P ⟨φ|φ↗ω⟩.
   Proof. intros; rewrite app_nil_end; now apply bar_secures_bound. Qed.
 
   Lemma af_secures_bar_secures R ω : af_secures R ω → bar_secures (good R) [] (ω⁺¹⁺¹).
@@ -106,7 +106,7 @@ Section af_secure.
     + intros; now apply IH with (l := _::_).
   Qed.
 
-  Lemma af_secures_good_bound R ω φ : af_secures R ω → good R (pfx_rev φ φ↗ω⁺¹⁺¹).
+  Lemma af_secures_good_bound R ω φ : af_secures R ω → good R ⟨φ|φ↗ω⁺¹⁺¹⟩.
   Proof. now intros; apply bar_secures_nil_bound, af_secures_bar_secures. Qed.
 
   Definition afₛ R := ∀φ, ∃ i j, i < j ∧ R (φ i) (φ j).
@@ -123,7 +123,7 @@ Section af_secure.
   Proof. intros ? ?; now apply good_pfx_rev, af_secures_good_bound. Qed. 
 
   (** Remark: we need to lift by 1 to be able to find an inhabitant in X *)
-  Theorem WFT_bar_secures P l ω : (∀φ, P (pfx_rev φ φ↗ω⁺¹ ++ l)) → bar_secures P l ω⁺¹.
+  Theorem WFT_bar_secures P l ω : (∀φ, P (⟨φ|φ↗ω⁺¹⟩ ++ l)) → bar_secures P l ω⁺¹.
   Proof.
     induction ω as [ | f IHf ] in l |- *; intros Hf.
     + simpl in Hf |- *.
@@ -136,7 +136,7 @@ Section af_secure.
       rewrite WFT_lift_ht; apply Hf.
   Qed.
 
-  Lemma good_af_secures R ω : (∀φ, good R (pfx_rev φ φ↗ω)) → af_secures R ω⁺¹.
+  Lemma good_af_secures R ω : (∀φ, good R ⟨φ|φ↗ω⟩) → af_secures R ω⁺¹.
   Proof.
     intros H.
     apply bar_secures_af_secures with (l := []), WFT_bar_secures.
@@ -158,41 +158,67 @@ Section af_secure.
 
   Section using_Brouwer_thesis.
 
-    Hypothesis BT : ∀P,    (∀φ, ∃n, P (pfx_rev φ n))
-                      → ∃ω, ∀φ, ∃n, (P ∩₁ (stump ω)) (pfx_rev φ n).
+    (** In Wim Veldman's p222 §3.7, the statement of Brouwer's thesis
 
-    Theorem Brouwer_thesis_monotonic P :
-               (∀ l r, P r → P (l++r))
-             → (∀φ, ∃n, P (pfx_rev φ n))
-             → ∃ω, ∀φ, P (pfx_rev φ φ↗ω).
+        "Let P be a subset of the set of finite sequences of natural numbers.
+         If for every infinite sequence φ of natural numbers, there exists n 
+         such that <φ₀;...;φₙ₋₁> belongs to P, then there exists a stump σ 
+         such that for every infinite sequence φ of natural numbers there 
+         exists n such that <φ₀;...;φₙ₋₁> belongs to σ and P." *)
+
+    (* Here we rewrite the statement viewing lists as finite sequences
+       in reverse, hence the prefix sequence is the list [φₙ₋₁;...;φ₀]
+       also denoted ⟨φ|n⟩. Moreover, a stump σ is computed from a ω : WFT X
+       as σ := stump ω. *)
+
+    Hypothesis BT : ∀P,    (∀φ, ∃n, P ⟨φ|n⟩)
+                      → ∃ω, ∀φ, ∃n, ((stump ω) ∩₁ P) ⟨φ|n⟩.
+
+    (** Assuming Brouwer's thesis and a monotonic predicate,
+        one can compute a WFT for which ⟨φ|φ↗ω⟩ gives a prefix
+        of φ satisfying P for any φ : nat → X *)
+
+    Lemma Brouwer_thesis_monotonic P :
+               (∀ x l, P l → P (x::l))
+             → (∀φ, ∃n, P ⟨φ|n⟩)
+             → ∃ω, ∀φ, P ⟨φ|φ↗ω⟩.
     Proof.
       intros Pmono HP.
-      destruct (BT P) as (t & Ht); auto.
-      exists t; intros phi.
-      destruct (Ht phi) as (h & H1 & H2).
-      apply stump_ht in H2.
-      replace (WFT_ht phi t) with ((WFT_ht phi t-h)+h) by lia.
+      assert (Pmono' : ∀ l r, P r → P (l++r)) 
+        by (induction l; simpl; eauto).
+      destruct (BT P) as (ω & Hω); auto.
+      exists ω; intros phi.
+      destruct (Hω phi) as (h & H1%stump_ht & H2).
+      replace (WFT_ht phi ω) with ((WFT_ht phi ω-h)+h) by lia.
       rewrite pfx_rev_plus.
-      now apply Pmono.
+      now apply Pmono'.
     Qed.
 
-    Theorem Brouwer_af R : afₛ R → ∃ω, af_secures R ω.
+    (** Since P := good R is a monotonic predicate, we
+        instanciate Brouwer_thesis_monotonic *)
+
+    Theorem Brouwer_afₛ R : afₛ R → ∃ω, af_secures R ω.
     Proof.
       intros HR.
-      destruct Brouwer_thesis_monotonic with (P := good R) as (t & Ht).
-      + intros; now apply good_app_left.
+      destruct Brouwer_thesis_monotonic with (P := good R) as (ω & Hω).
+      + now constructor 2.
       + intros phi.
         destruct (HR phi) as (i & j & []).
         exists (S j); apply good_pfx_rev.
         exists i, j; split; auto; lia.
-      + exists (WFT_lift t); now apply good_af_secures.
+      + exists (WFT_lift ω); now apply good_af_secures.
     Qed.
 
-    Theorem Brouwer_afₛ R : afₛ R → ∃ω, afₛ_secures R ω.
+    Theorem Brouwers_Thesis_equivalences R : 
+          (afₛ R → ∃ω, af_secures R ω)
+        ∧ ((∃ω, af_secures R ω) → ∃ω, afₛ_secures R ω)
+        ∧ ((∃ω, afₛ_secures R ω) → afₛ R).
     Proof.
-      intros (t & Ht)%Brouwer_af.
-      exists t⁺¹⁺¹.
-      intro; now apply af_secures_afₛ_secures.
+      repeat split.
+      + apply Brouwer_afₛ.
+      + apply afₛ_secures_iff_af_secures.
+      + intros (ω & Hω) phi.
+        destruct (Hω phi) as (i & j & [] & ?); eauto.
     Qed.
 
   End using_Brouwer_thesis.
@@ -201,35 +227,35 @@ Section af_secure.
 
     Hypothesis FunChoice : ∀(F : X → WFT X → Prop), (∀x, ∃y, F x y) → ∃f, ∀x, F x (f x).
 
-    Fact af_af_secured R : af R → ∃ω, af_secures R ω.
+    Lemma af_af_secures R : af R → ∃ω, af_secures R ω.
     Proof.
       induction 1 as [ R HR | R _ (f & Hf)%FunChoice ].
       + now exists leaf.
       + exists (node f); assumption.
     Qed.
 
-    Fact bar_bar_secures P l : bar P l → ∃ω, bar_secures P l ω.
+    Theorem FunChoice_equivalences R :
+             (af R → ∃ω, af_secures R ω)
+           ∧ ((∃ω, af_secures R ω) → ∃ω, afₛ_secures R ω)
+           ∧ ((∃ω, afₛ_secures R ω) → af R).
+    Proof.
+      rewrite afₛ_secures_iff_af_secures.
+      repeat split; auto.
+      + apply af_af_secures.
+      + now intros (? & ?%af_secures_af).
+    Qed.
+
+    Lemma bar_bar_secures P l : bar P l → ∃ω, bar_secures P l ω.
     Proof.
       induction 1 as [ | l _ (f & Hf)%FunChoice ].
       + now exists leaf.
       + exists (node f); assumption.
     Qed.
 
-    Theorem bar_brouwer P l : bar P l → ∃ω, ∀φ, P (pfx_rev φ φ↗ω ++ l).
+    Theorem bar_brouwer P l : bar P l → ∃ω, ∀φ, P (⟨φ|φ↗ω⟩ ++ l).
     Proof.
-      intros (t & Ht)%bar_bar_secures.
-      exists t.
-      induction t as [ | f IHf ] in l, Ht |- *; intros phi; simpl in Ht; auto.
-      simpl WFT_ht; rewrite pfx_rev_S, app_ass.
-      apply IHf with (l := _::l); auto.
-    Qed.
-
-    Theorem af_brouwer R : af R → ∃ω, ∀φ, good R (pfx_rev φ φ↗ω).
-    Proof.
-      intros (t & Ht)%af_iff_bar_good_nil%bar_brouwer.
-      exists t; intros phi.
-      specialize (Ht phi).
-      now rewrite <- app_nil_end in Ht.
+      intros (ω & Hω)%bar_bar_secures.
+      exists ω; intro; now apply bar_secures_bound.
     Qed.
 
   End using_Fun_Choice.
