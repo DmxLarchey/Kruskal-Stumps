@@ -22,7 +22,16 @@ Section af_secure_Type.
 
   Variable (X : Type).
 
-  Implicit Types (R : rel₂ X) (φ : nat → X) (l : list X).
+  Implicit Types (R : rel₂ X) (φ : nat → X) (ω : WFT X) (l : list X).
+
+  (** The existence of a good pair below n can be characterized
+      by the inductive predicate "good R" applied to the prefix
+      ⟨φ|n⟩ := [φₙ₋₁;...;φ₀] of the infinite sequence φ.
+
+        good R [φₙ₋₁;...;φ₀] ↔ ∃ i < j < n, R φᵢ φⱼ *)
+
+  Local Remark good_vs_good_pairs R φ n : good R ⟨φ|n⟩ ↔ ∃ i j, i < j < n ∧ R (φ i) (φ j).
+  Proof. apply good_pfx_rev. Qed.
 
   (* Using a WFT as a mesure of the almost fullness of binary relation *)
   Fixpoint af_secures R t :=
@@ -38,15 +47,12 @@ Section af_secure_Type.
     + constructor 2; eauto.
   Qed.
 
-  (* good is characterized inductively in KruskalAf imported above but
-     it is there proved equivalent to the FO formulation:
-
-        good R [φₙ₋₁;...;φ₀] ↔ ∃ i < j < n, R φᵢ φⱼ *)
-
-  Local Remark good_vs_good_pairs R φ n : good R ⟨φ|n⟩ ↔ ∃ i j, i < j < n ∧ R (φ i) (φ j).
-  Proof. apply good_pfx_rev. Qed.
+  Definition afₛ R := ∀φ, { n | ∃ i j, i < j < n ∧ R (φ i) (φ j) }.
 
   Definition afₛ_secures R ω := ∀φ, ∃ i j, i < j < φ↗ω ∧ R (φ i) (φ j).
+
+  Fact afₛ_secures_afₛ R ω : afₛ_secures R ω → afₛ R.
+  Proof. intros H phi; exists (phi↗ω); apply H. Qed.
 
   (* We need to generalize the following way to get af_secures → afₛ_secures below *)
   Lemma af_secures_good R ω l φ : af_secures (R⇈l) ω → good R (⟨φ|φ↗ω⁺¹⁺¹⟩ ++ l).
@@ -92,8 +98,8 @@ Section af_secure_Type.
   Remark FunChoice_type (F : X → WFT X → Prop) : (∀u, {v | F u v}) → {f | ∀u, F u (f u)}.
   Proof. intros f; exists (fun u => proj1_sig (f u)); intro; apply (proj2_sig _). Qed.
 
-  (* Using FunChoice_type, provable for Σ-types, ie Type-bounded existential quantifiers,
-     we easily get af → af_secures for some WFT X *)
+  (* Using FunChoice_type, provable for Σ-types (Type-bounded existential quantifiers),
+     we easily get af → af_secures for some WFT X, when Base := Type *)
   Lemma af_af_secures R : af R → { ω | af_secures R ω }.
   Proof.
     induction 1 as [ | ? _ (ρ & ?)%FunChoice_type ].
