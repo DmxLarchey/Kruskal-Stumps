@@ -278,28 +278,26 @@ Section af_secure.
       + constructor 1.
         intros x y.
         now destruct (H (fun _ => x)). 
-      + assert (∀φ, good R l ∨ ∃ n, stump (node ρ) ⟨φ|S n⟩ ∧ good R (⟨φ|S n⟩ ++ l)) as [H' | H']%forall_disj.
+      + assert (∀φ, good R l /\ stump (node ρ) [] ∨ ∃ n, stump (ρ (φ 0)) ⟨↓φ|n⟩ ∧ good R (⟨↓φ|n⟩ ++ φ 0 :: l)) as H'.
         1: { intros phi.
              destruct (H phi) as (n & H1 & H2).
              destruct n as [ | n ]; auto.
              right.
              destruct H1 as [ | H1 ]; [ easy | ].
+             destruct H1 as (x & m & H1 & H3).
+             rewrite pfx_rev_S in H1, H2.
+             rewrite app_ass in H2.
              exists n; split; auto.
-             right; auto. }
-        * constructor 1; intros; apply rel_lift_rel_iff_good; auto.
-        * clear H.
-          constructor 2; intros a.
-          apply IH with (l := _::_) (x := a).
+             now apply app_inj_tail_iff in H1 as (<- & <-). }
+        constructor 2; intros a.
+        destruct (H' (fun _ => a)) as [ (H1 & H2) | (n & H1 & H2) ].
+        * constructor 1; left; apply rel_lift_rel_iff_good; auto.
+        * apply IH with (l := _::_) (x := a).
           intros phi.
-          specialize (H' (a⋅phi)).
-          destruct H' as (n' & H1 & H2).
-          rewrite pfx_rev_S in H1, H2.
-          rewrite app_ass in H2.
-          exists n'; split; auto.
-          destruct H1 as [ | (x & m & H1 & H3) ].
-          1: now destruct n'.
-          apply app_inj_tail_iff in H1 as (<- & <-); eauto.
-    Qed.
+          destruct (H' (a⋅phi)) as [ (H3 & H4) | (m & H3 & H4) ].
+          - exists 0; simpl.
+       (* trying a rewrite for avoiding forall_disj ... *) 
+    Admitted.
 
     Lemma afS_af R Γ l : Stump Γ → (∀φ, ∃n, Γ ⟨φ|n⟩ ∧ good R (⟨φ|n⟩++l)) → af (R⇈l).
     Proof.
@@ -307,33 +305,28 @@ Section af_secure.
       + constructor 1. 
         intros x y.
         now destruct (H (fun _ => x)).
-      + assert (∀φ, good R l ∨ ∃ n, rho (φ 0) ⟨↓φ|n⟩ ∧ good R (⟨φ|S n⟩ ++ l)) as [H' | H']%forall_disj.
+      + assert (∀φ, good R l ∨ ∃ n, rho (φ 0) ⟨↓φ|n⟩ ∧ good R (⟨↓φ|n⟩ ++ φ 0 :: l)) as [H' | H']%forall_disj.
         1: { intros phi.
              destruct (H phi) as (n & H1 & H2).
              destruct n as [ | n ]; auto.
              right.
              destruct H1 as [ | H1 ]; [ easy | ].
-             exists n; split; auto.
              destruct H1 as (x & m & H1 & H3).
-             rewrite pfx_rev_S in H1.
+             rewrite pfx_rev_S in H1, H2.
+             rewrite app_ass in H2.
+             exists n; split; auto.
              now apply app_inj_tail_iff in H1 as (<- & <-). }
-        all: clear H.
         * constructor 1; intros; apply rel_lift_rel_iff_good; auto.
         * constructor 2; intros a.
           apply IHrho with (l := _::_) (x := a).
-          intros phi.
-          specialize (H' (a⋅phi)).
-          destruct H' as (n & H1 & H2).
-          rewrite pfx_rev_S, app_ass in H2.
-          exists n; split; auto.
+          intro; apply (H' (_⋅_)).
     Qed.
 
     Theorem afS_forall_disj R Γ : Stump Γ → afS_secures R Γ → af R.
     Proof.
       intros H1 H2; apply afS_af with (1 := H1) (l := []).
       intros phi.
-      destruct (H2 phi) as (n & []).
-      exists n; split; auto.
+      destruct (H2 phi) as (n & []); eauto.
     Qed.
 
     Theorem af_iff_afS R : af R ↔ ∃Γ, Stump Γ ∧ afS_secures R Γ.
