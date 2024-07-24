@@ -77,6 +77,9 @@ Section af_secure.
   (* Using infinite sequences *)
   Definition afₛ_secures R ω := ∀φ, ∃ i j, i < j < φ↗ω ∧ R (φ i) (φ j).
 
+  Fact afs_secures_iff_good R ω : afₛ_secures R ω ↔ ∀φ, good R ⟨φ|φ↗ω⟩.
+  Proof. split; intros ? ?; now apply good_pfx_rev. Qed.
+
   Fact afₛ_secures_afₛ R ω : afₛ_secures R ω → afₛ R.
   Proof.
     intros H phi.
@@ -85,7 +88,7 @@ Section af_secure.
   Qed.
 
   (* We need to generalize the following way to get af_secures → afₛ_secures below *)
-  Lemma af_secures_good R ω l φ : af_secures (R⇈l) ω → good R (⟨φ|φ↗ω⁺¹⁺¹⟩ ++ l).
+  Lemma af_secures_good R ω l φ : af_secures R⇈l ω → good R (⟨φ|φ↗ω⁺¹⁺¹⟩ ++ l).
   Proof.
     induction ω as [ | ρ IH ] in l, φ |- *; intros H.
     + simpl.
@@ -109,10 +112,11 @@ Section af_secure.
   Qed.
 
   (* We need to generalize the following way to get afₛ_secures → af_secures below *)
-  Lemma good_af_secures R ω l : (∀φ, good R (⟨φ|φ↗ω⟩ ++ l)) → af_secures (R⇈l) ω⁺¹.
+  Lemma good_af_secures R ω l : (∀φ, good R (⟨φ|φ↗ω⟩ ++ l)) → af_secures R⇈l ω⁺¹.
   Proof.
     induction ω as [ | ρ IH ] in l |- *; intros H.
-    + simpl in H; left; apply rel_lift_rel_iff_good; left; auto.
+    + simpl in H |- *. 
+      left; apply rel_lift_rel_iff_good; left; auto.
     + intros a.
       apply IH with (l := _::_).
       intros phi.
@@ -158,17 +162,8 @@ Section af_secure.
        hence the prefix sequence is the list [φₙ₋₁;...;φ₀] also denoted ⟨φ|n⟩.
        Moreover, a stump σ is computed from ω : WFT X as σ := stump ω. *)
 
-    Inductive Stump : (list X → Prop) → Prop :=
-      | Stump_empty : Stump (λ _, False)
-      | Stump_node ρ : (∀x, Stump (ρ x)) → Stump (λ l, l = [] ∨ ∃ x l', l = l'++[x] ∧ ρ x l').
-
-    Definition afS_secures R S := ∀φ, ∃n, (S ∩₁ (good R)) ⟨φ|n⟩.
-
     Hypothesis BT : ∀P,    (∀φ, ∃n, P ⟨φ|n⟩)
                       → ∃ω, ∀φ, ∃n, ((stump ω) ∩₁ P) ⟨φ|n⟩.
-
-    Hypothesis BT' : ∀P,    (∀φ, ∃n, P ⟨φ|n⟩)
-                      → ∃S, Stump S ∧ ∀φ, ∃n, (S ∩₁ P) ⟨φ|n⟩.
 
     (** Assuming Brouwer's thesis and a monotonic predicate,
         one can compute a WFT for which ⟨φ|φ↗ω⟩ gives a prefix
@@ -204,44 +199,6 @@ Section af_secure.
       + exists ω; intro; apply good_pfx_rev, Hω.
     Qed.
 
-    Theorem Brouwer_afS R : afₛ R → ∃S, Stump S ∧ afS_secures R S.
-    Proof.
-      intros HR.
-      destruct BT' with (P := good R) as (S & H1 & H2).
-      + intros phi; destruct (HR phi) as (i & j & []).
-        exists (S j); apply good_pfx_rev.
-        exists i, j; split; auto; lia.
-      + exists S; split; auto.
-    Qed.
-
-    Fact afS_afₛ R S : Stump S → afS_secures R S → af R.
-    Proof.
-      intros H1 H2; constructor 2; revert H1 H2.
-      induction 1 as [ | r Hr IHr ] in R |- *; intros H x.
-      + destruct (H (fun _ => x)) as (? & [] & _).
-      + constructor 2; intros y.
-        apply (IHr x).
-        intros phi.
-        destruct (H (x⋅phi)) as (n & H1 & H2).
-        destruct n as [ | [ | n ] ].
-        1: now apply good_nil_inv in H2.
-        1: now apply good_sg_inv in H2.
-        destruct H1 as [ H1 | (z & l' & E & H1) ]; [ easy | ].
-        rewrite pfx_rev_S in E, H2.
-        apply app_inj_tail_iff in E as (<- & <-).
-        Search good app.
-        exists (S n); split; auto.
-        Check (good_rel_lift_rev _ _ H2).
-        generalize (good_rel_lift_rev _ _ H2 (phi (S n))).
-        rewrite good_cons_inv.
-        intros [ (z & G1 & G2) | ]; auto.
-        destruct G1 as [ <- | G1 ].
- 
-        simpl; constructor 1 with z.
-        Search good cons.
-        
-     
-
     (** Under Brouwer's thesis, the following statements are equivalent:
 
           1. ∃ω, afₛ_secures R ω
@@ -271,6 +228,124 @@ Section af_secure.
     Qed.
 
   End using_Brouwer_thesis.
+
+  Section Stump.
+
+    Inductive Stump : (list X → Prop) → Prop :=
+      | Stump_empty : Stump (λ _, False)
+      | Stump_node ρ : (∀x, Stump (ρ x)) → Stump (λ l, l = [] ∨ ∃ x l', l = l'++[x] ∧ ρ x l').
+
+    Definition finitary Γ := ∃l, ∀x m, Γ (x::m) → x ∈ l → False.
+
+    Definition afS_secures R Γ := ∀φ, ∃n, (Γ ∩₁ (good R)) ⟨φ|n⟩.
+
+    Hypothesis BT' : ∀P,    (∀φ, ∃n, P ⟨φ|n⟩)
+                      → ∃Γ, Stump Γ ∧ ∀φ, ∃n, (Γ ∩₁ P) ⟨φ|n⟩.
+
+    Theorem Brouwer_afS R : afₛ R → ∃Γ, Stump Γ ∧ afS_secures R Γ.
+    Proof.
+      intros HR.
+      destruct BT' with (P := good R) as (Γ & H1 & H2).
+      + intros phi; destruct (HR phi) as (i & j & []).
+        exists (S j); apply good_pfx_rev.
+        exists i, j; split; auto; lia.
+      + exists Γ; split; auto.
+    Qed.
+
+    Lemma good_af R ω l : (∀φ, good R (⟨φ|φ↗ω⟩ ++ l)) → af R⇈l.
+    Proof.
+      induction ω as [ | ρ IH ] in l |- *; intros H.
+      + simpl in H |- *.
+        constructor 1.
+        intros x y.
+        apply rel_lift_rel_iff_good; left; auto.
+      + constructor 2; intros a.
+        apply IH with (l := _::_) (x := a).
+        intros phi.
+        specialize (H (a⋅phi)).
+        simpl WFT_ht in H.
+        now rewrite pfx_rev_S, app_ass in H.
+    Qed.
+
+    Hypothesis forall_disj : ∀ P (Q : (nat → X) → Prop), (∀φ, P ∨ Q φ) →  P ∨ ∀φ, Q φ.
+
+    (* One should be able to exclude the case good R l a priori below if
+       one is to avoid using forall_disj ... *)
+
+    Lemma good_stump_af R ω l : (∀φ, ∃n, stump ω ⟨φ|n⟩ ∧ good R (⟨φ|n⟩ ++ l)) → af R⇈l.
+    Proof.
+      induction ω as [ | ρ IH ] in l |- *; intros H.
+      + constructor 1.
+        intros x y.
+        now destruct (H (fun _ => x)). 
+      + assert (∀φ, good R l ∨ ∃ n, stump (node ρ) ⟨φ|S n⟩ ∧ good R (⟨φ|S n⟩ ++ l)) as [H' | H']%forall_disj.
+        1: { intros phi.
+             destruct (H phi) as (n & H1 & H2).
+             destruct n as [ | n ]; auto.
+             right.
+             destruct H1 as [ | H1 ]; [ easy | ].
+             exists n; split; auto.
+             right; auto. }
+        * constructor 1; intros; apply rel_lift_rel_iff_good; auto.
+        * clear H.
+          constructor 2; intros a.
+          apply IH with (l := _::_) (x := a).
+          intros phi.
+          specialize (H' (a⋅phi)).
+          destruct H' as (n' & H1 & H2).
+          rewrite pfx_rev_S in H1, H2.
+          rewrite app_ass in H2.
+          exists n'; split; auto.
+          destruct H1 as [ | (x & m & H1 & H3) ].
+          1: now destruct n'.
+          apply app_inj_tail_iff in H1 as (<- & <-); eauto.
+    Qed.
+
+    Lemma afS_af R Γ l : Stump Γ → (∀φ, ∃n, Γ ⟨φ|n⟩ ∧ good R (⟨φ|n⟩++l)) → af (R⇈l).
+    Proof.
+      induction 1 as [ | rho Hrho IHrho ] in R, l |- *; intros H.
+      + constructor 1. 
+        intros x y.
+        now destruct (H (fun _ => x)).
+      + assert (∀φ, good R l ∨ ∃ n, rho (φ 0) ⟨↓φ|n⟩ ∧ good R (⟨φ|S n⟩ ++ l)) as [H' | H']%forall_disj.
+        1: { intros phi.
+             destruct (H phi) as (n & H1 & H2).
+             destruct n as [ | n ]; auto.
+             right.
+             destruct H1 as [ | H1 ]; [ easy | ].
+             exists n; split; auto.
+             destruct H1 as (x & m & H1 & H3).
+             rewrite pfx_rev_S in H1.
+             now apply app_inj_tail_iff in H1 as (<- & <-). }
+        all: clear H.
+        * constructor 1; intros; apply rel_lift_rel_iff_good; auto.
+        * constructor 2; intros a.
+          apply IHrho with (l := _::_) (x := a).
+          intros phi.
+          specialize (H' (a⋅phi)).
+          destruct H' as (n & H1 & H2).
+          rewrite pfx_rev_S, app_ass in H2.
+          exists n; split; auto.
+    Qed.
+
+    Theorem afS_forall_disj R Γ : Stump Γ → afS_secures R Γ → af R.
+    Proof.
+      intros H1 H2; apply afS_af with (1 := H1) (l := []).
+      intros phi.
+      destruct (H2 phi) as (n & []).
+      exists n; split; auto.
+    Qed.
+
+    Theorem af_iff_afS R : af R ↔ ∃Γ, Stump Γ ∧ afS_secures R Γ.
+    Proof.
+      split.
+      + now intros ?%af_afₛ%Brouwer_afS.
+      + intros (G & H1 & H2); revert H1 H2; apply afS_forall_disj.
+    Qed.
+
+  End Stump.
+
+  Check af_iff_afS.
 
   Section using_Fun_Choice.
 
