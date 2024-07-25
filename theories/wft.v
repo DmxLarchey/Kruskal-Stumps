@@ -9,6 +9,10 @@
 
 From Coq Require Import Arith Lia List Utf8.
 
+From KruskalTrees
+  Require Import list_utils.
+
+
 Set Implicit Arguments.
 
 Import ListNotations.
@@ -108,6 +112,37 @@ Section WFT_tools.
         rewrite pfx_rev_S in E.
         apply app_inj_tail in E as []; subst.
         apply IH in H; lia.
+  Qed.
+
+  Fact stump_cons_inv ω x r : stump ω (x::r) → stump ω r.
+  Proof.
+    induction ω as [ | ρ IH ] in x, r |- *; simpl; auto.
+    intros [ | (z & [ | u m ] & E & H) ]; try easy.
+    * inversion E; auto.
+    * inversion E; subst u r.
+      right; eauto.
+  Qed.
+
+  Fact stump_app_inv ω l r : stump ω (l++r) → stump ω r.
+  Proof.
+    induction l; simpl; auto.
+    intros ?%stump_cons_inv; eauto.
+  Qed.
+
+  Fact stump_inv_nil ω l : stump ω l → stump ω [].
+  Proof. rewrite <- (app_nil_r l); apply stump_app_inv. Qed.
+
+  Fact stump_dec ω : ∀l, stump ω l ∨ ¬ stump ω l.
+  Proof.
+    induction ω as [ | ρ IHρ ]; simpl.
+    + now right.
+    + intros l.
+      destruct (list_snoc_inv l) as [ -> | (m & x & ->) ]; auto.
+      destruct (IHρ x m).
+      * left; right; eauto.
+      * right; intros [ | (z & m' & E & ?) ].
+        - now destruct m.
+        - now apply app_inj_tail_iff in E as (<- & <-).
   Qed.
 
   Inductive lt_WFT : WFT → WFT → Prop :=

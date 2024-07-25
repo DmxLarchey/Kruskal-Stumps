@@ -9,8 +9,11 @@
 
 From Coq Require Import Arith Lia List Utf8.
 
+From KruskalTrees
+  Require Import list_utils.
+
 From KruskalAfProp
-  Require Import base notations pfx_rev almost_full.
+  Require Import base notations pfx_rev almost_full af_bar.
 
 From KruskalHigmanProp
   Require Import tactics.
@@ -235,6 +238,22 @@ Section af_secure.
       | Stump_empty : Stump (λ _, False)
       | Stump_node ρ : (∀x, Stump (ρ x)) → Stump (λ l, l = [] ∨ ∃ x l', l = l'++[x] ∧ ρ x l').
 
+    Fact Stump_dec Γ : Stump Γ → ∀ l, Γ l ∨ ¬ Γ l.
+    Proof.
+      induction 1 as [ | ρ Hρ IHρ ].
+      + tauto.
+      + intros l.
+        destruct (list_snoc_inv l) as [ -> | (m & x & ->) ]; auto.
+        destruct (IHρ x m).
+        * left; right; eauto.
+        * right; intros [ | (z & m' & E & ?) ].
+          - now destruct m.
+          - now apply app_inj_tail_iff in E as (<- & <-).
+    Qed.
+
+    Fact Stump_dec_empty Γ : Stump Γ → Γ = (λ _, False) ∨ Γ [].
+    Proof. induction 1; auto. Qed.
+
     Definition finitary Γ := ∃l, ∀x m, Γ (x::m) → x ∈ l → False.
 
     Definition afS_secures R Γ := ∀φ, ∃n, (Γ ∩₁ (good R)) ⟨φ|n⟩.
@@ -267,37 +286,50 @@ Section af_secure.
         now rewrite pfx_rev_S, app_ass in H.
     Qed.
 
-    Hypothesis forall_disj : ∀ P (Q : (nat → X) → Prop), (∀φ, P ∨ Q φ) →  P ∨ ∀φ, Q φ.
+    Lemma good_stump_bar R ω l : (∀φ, ∃n, stump ω ⟨φ|n⟩ ∧ good R (⟨φ|n⟩++l)) → bar (good R) l.
+    Proof.
+      induction ω as [ | ρ IH ] in l |- *; intros H.
+      + constructor 2; constructor 1.
+        now destruct (H (fun _ => x)).
+      + constructor 2; intros a.
+        destruct (stump_dec (ρ a) []) as [ Ha | Ha ]. (* Here is the criterium to decide on good R l !!!*)
+        * apply IH with a.
+          intros phi.
+          destruct (H (a⋅phi)) as (n & H1 & H2).
+          simpl in H1.
+          destruct n as [ | n ].
+          1:{ exists 0; simpl; auto. }
+          destruct H1 as [ | (z & m & H1 & H3) ]; [ easy | ].
+          rewrite pfx_rev_S in H1, H2.
+          apply app_inj_tail_iff in H1 as (<- & <-).
+          exists n; split; auto.
+          now rewrite app_ass in H2.
+        * (* Since ¬ stump (ρ a) [] then we use H on the constant function fun _ => a *)
+          destruct (H (fun _ => a)) as ([ | n ] & H1 & H2).
+          - constructor 1; auto.
+          - rewrite pfx_rev_S in H1.
+            destruct H1 as [ H1 | (z & u & H1 & H3) ].
+            1: now destruct n.
+            apply app_inj_tail_iff in H1 as (<- & <-).
+            destruct Ha.
+            revert H3; apply stump_inv_nil.
+    Qed.
+
+    (* And we get the theorem that we want !!! *)
+    Theorem good_stump_af R ω : (∀φ, ∃n, stump ω ⟨φ|n⟩ ∧ good R ⟨φ|n⟩) → af R.
+    Proof.
+      intros H.
+      apply af_iff_bar_good_nil, good_stump_bar with ω.
+      intros phi.
+      destruct (H phi) as (n & ?).
+      exists n.
+      now rewrite app_nil_r.
+    Qed.
+
+   Hypothesis forall_disj : ∀ P (Q : (nat → X) → Prop), (∀φ, P ∨ Q φ) →  P ∨ ∀φ, Q φ.
 
     (* One should be able to exclude the case good R l a priori below if
        one is to avoid using forall_disj ... *)
-
-    Lemma good_stump_af R ω l : (∀φ, ∃n, stump ω ⟨φ|n⟩ ∧ good R (⟨φ|n⟩ ++ l)) → af R⇈l.
-    Proof.
-      induction ω as [ | ρ IH ] in l |- *; intros H.
-      + constructor 1.
-        intros x y.
-        now destruct (H (fun _ => x)). 
-      + assert (∀φ, good R l /\ stump (node ρ) [] ∨ ∃ n, stump (ρ (φ 0)) ⟨↓φ|n⟩ ∧ good R (⟨↓φ|n⟩ ++ φ 0 :: l)) as H'.
-        1: { intros phi.
-             destruct (H phi) as (n & H1 & H2).
-             destruct n as [ | n ]; auto.
-             right.
-             destruct H1 as [ | H1 ]; [ easy | ].
-             destruct H1 as (x & m & H1 & H3).
-             rewrite pfx_rev_S in H1, H2.
-             rewrite app_ass in H2.
-             exists n; split; auto.
-             now apply app_inj_tail_iff in H1 as (<- & <-). }
-        constructor 2; intros a.
-        destruct (H' (fun _ => a)) as [ (H1 & H2) | (n & H1 & H2) ].
-        * constructor 1; left; apply rel_lift_rel_iff_good; auto.
-        * apply IH with (l := _::_) (x := a).
-          intros phi.
-          destruct (H' (a⋅phi)) as [ (H3 & H4) | (m & H3 & H4) ].
-          - exists 0; simpl.
-       (* trying a rewrite for avoiding forall_disj ... *) 
-    Admitted.
 
     Lemma afS_af R Γ l : Stump Γ → (∀φ, ∃n, Γ ⟨φ|n⟩ ∧ good R (⟨φ|n⟩++l)) → af (R⇈l).
     Proof.
