@@ -114,6 +114,9 @@ Section WFT_tools.
         apply IH in H; lia.
   Qed.
 
+  Fact stump_empty_dec ω : stump ω [] ∨ stump ω = λ _, False.
+  Proof. destruct ω; simpl; auto. Qed.
+
   Fact stump_cons_inv ω x r : stump ω (x::r) → stump ω r.
   Proof.
     induction ω as [ | ρ IH ] in x, r |- *; simpl; auto.
