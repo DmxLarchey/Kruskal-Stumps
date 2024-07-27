@@ -436,7 +436,7 @@ Section af_secure.
     Proof.
       induction 1 as [ Γ H1 | Γ H1 H2 IH2 ] in l |- *; intros H.
       + constructor 1. 
-        intros x y.
+        intros x ?.
         now destruct (H (λ _, x)) as (_ & ?%H1 & _).
       + constructor 2; intros a.
         (* We use the emptyness of λ l, Γ (l++[a]) to discriminate between n = 0 or not
@@ -476,6 +476,47 @@ Section af_secure.
     Qed.
 
     (* This one seems difficult to get ... *)
+
+    Definition make_Stump R l :=
+      match l with
+      | []   => True
+      | x::l => ~ good R l
+      end.
+
+    (* make_Stump (True) l <-> length l <= 2 
+
+       what could be a positive criteria ? *)
+
+    Lemma af_make_Stump R : af R -> (forall x y, R x y \/ ~ R x y) -> Stump (make_Stump R) /\ afS_secures R (make_Stump R).
+    Proof.
+      induction 1 as [ R HR | R HR IHR ]; intros Rdec; split.
+      + constructor 2; simpl; auto.
+        intros x; constructor 2; simpl.
+        1: now intros ?%good_nil_inv.
+        intros y; constructor 2; simpl.
+        1: now intros ?%good_sg_inv.
+        intros z; simpl.
+        constructor 1.
+        intros [ | a l ]; simpl; intros H; apply H.
+        * constructor 1 with x; simpl; auto.
+        * rewrite app_ass; apply good_app_left.
+          constructor 1 with x; simpl; auto.
+      + intros phi; exists 2; split; simpl.
+        * now intros ?%good_sg_inv.
+        * constructor 1 with (phi 0); simpl; auto.
+      + constructor 2; simpl; auto.
+        intros x.
+        destruct (IHR x) as (H1 & H2).
+        * admit.
+        * revert H1.
+          apply Stump_ext.
+          intros [ | z l ]; simpl.
+          Search good app.
+          - rewrite good_nil_inv; tauto.
+          - rewrite good_rel_lift_rev_iff.
+            admit.
+      + intros phi.
+    Admitted.
 
     Lemma af_afStump R : af R → ∃Γ, Stump Γ ∧ afS_secures R Γ.
     Proof.
