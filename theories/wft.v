@@ -114,6 +114,16 @@ Section WFT_tools.
         apply IH in H; lia.
   Qed.
 
+  Fact stump_pfx_rev ω φ : stump ω⁺¹ ⟨φ|φ↗ω⟩.
+  Proof.
+    induction ω as [ | ρ IH ] in φ |- *.
+    + now left.
+    + right.
+      exists (φ 0), ⟨↓φ|↓φ↗(ρ (φ 0))⟩.
+      simpl WFT_ht.
+      rewrite pfx_rev_S; auto.
+  Qed.
+
   Fact stump_empty_dec ω : stump ω [] ∨ stump ω = λ _, False.
   Proof. destruct ω; simpl; auto. Qed.
 

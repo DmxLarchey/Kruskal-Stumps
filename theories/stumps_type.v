@@ -22,7 +22,7 @@ Section af_secure_Type.
 
   Variable (X : Type).
 
-  Implicit Types (R : rel₂ X) (φ : nat → X) (ω : WFT X) (l : list X).
+  Implicit Types (R : rel₂ X) (P : rel₁ (list X)) (φ : nat → X) (ω : WFT X) (l : list X).
 
   (** The existence of a good pair below n can be characterized
       by the inductive predicate "good R" applied to the prefix
@@ -118,6 +118,48 @@ Section af_secure_Type.
     + intros (? & ?%af_secures_afₛ_secures)%af_af_secures; eauto.
     + intros (? & ?%afₛ_secures_af_secures); eauto.
     + now intros (? & ?%af_secures_af).
+  Qed.
+
+  Definition bar_secures P :=
+    fix loop l ω :=
+      match ω with
+      | leaf   => P l
+      | node ρ => ∀a, loop (a::l) (ρ a)
+      end.
+
+  Hint Constructors bar : core.
+
+  Fact bar_secures_bar P l ω : bar_secures P l ω → bar P l.
+  Proof. induction ω in l |- *; simpl; eauto. Qed.
+
+  Fact bar_bar_secures P l : bar P l → { ω | bar_secures P l ω }.
+  Proof.
+    induction 1 as [ | ? _ (ρ & ?)%FunChoice_type ].
+    + now exists leaf.
+    + now exists (node ρ).
+  Qed.
+
+  Definition barₛ_secures P l ω := ∀φ, P (⟨φ|φ↗ω⟩++l).
+
+  Fact bar_secures_barₛ_secures P l ω : bar_secures P l ω → barₛ_secures P l ω.
+  Proof.
+    induction ω as [ | ρ IH ] in l |- *; intros H phi.
+    + now simpl in *.
+    + simpl WFT_ht; rewrite pfx_rev_S, app_ass.
+      apply IH with (l := _::_), H.
+  Qed.
+
+  Variables (P : rel₁ (list X)) (HP : ∀ x l, P l → P (x::l)).
+
+  Fact barₛ_secures_bar_secures l ω : barₛ_secures P l ω → bar_secures P l ω⁺¹.
+  Proof.
+    induction ω as [ | ρ IH ] in l |- *; intros H; simpl.
+    + intros a; apply HP, (H (λ _, a)).
+    + intros a; apply IH.
+      intros phi.
+      specialize (H (a⋅phi)).
+      simpl WFT_ht in H.
+      now rewrite pfx_rev_S, app_ass in H.
   Qed.
 
 End af_secure_Type.

@@ -272,6 +272,36 @@ Section af_secure.
 
   End using_Brouwer_thesis.
 
+  Definition extends l m :=
+    match l with
+    | []   => False
+    | _::l => l = m
+    end.
+
+  Section bar_dec.
+
+    Variables (P : list X → Prop) (Pdec : ∀l, P l ∨ ¬ P l). 
+
+    Fact bar_Acc l : bar P l → Acc (λ l m, extends l m ∧ ¬ P m) l.
+    Proof.
+      induction 1 as [ l Hl | l Hl IHl ].
+      + constructor 1; intros ? []; tauto.
+      + constructor 1; intros [ | x m ] [ H1 H2 ]; [ easy | ].
+        simpl in H1; subst m.
+        apply IHl.
+    Qed.
+
+    Fact Acc_bar l : Acc (λ l m, extends l m ∧ ¬ P m) l → bar P l.
+    Proof.
+      induction 1 as [ l Hl IHl ].
+      destruct (Pdec l) as [ H | H ].
+      + now constructor 1.
+      + constructor 2; intros x.
+        apply IHl; simpl; auto.
+    Qed.
+
+  End bar_dec.
+
   Section using_Brouwer_thesis'.
 
     Implicit Type Γ : list X → Prop.
@@ -364,7 +394,7 @@ Section af_secure.
       intros ?%(Stump_cons_inv _ _ H); eauto.
     Qed.
 
-    Definition pred_list_lift P m := exists l, list_embed eq l m /\ P l.
+    Definition pred_list_lift P m := ∃l, list_embed eq l m ∧ P l.
 
     Notation "↟ P" := (pred_list_lift P) (at level 0, right associativity, format "↟ P").
 
@@ -402,29 +432,6 @@ Section af_secure.
         exists (S j); apply good_pfx_rev.
         exists i, j; split; auto; lia.
       + exists Γ; split; auto.
-    Qed.
-
-    Lemma Stump_monotonic_bar P Γ : Stump Γ → (∀φ, ∃n, Γ∩₁P ⟨φ|n⟩) → (∀ x l, P l → P (x::l)) → bar P [].
-    Proof.
-      induction 1 as [ Γ H1 | Γ H1 H2 IH2 ] in P |- *; intros H HP.
-      + constructor 2; intros a.
-        now destruct (H (λ _, a)) as (_ & ?%H1 & _).
-      + constructor 2; intros a.
-        (* We use the emptyness of λ l, Γ (l++[a]) to discriminate between n = 0 or not
-           in the ∃n of hypothesis H for any φ starting such that φ 0 = a *)
-        destruct Stump_empty_dec with (1 := H2 a) as [ Ha | Ha ].
-        * (* Γ [a] holds hence we can do something with the case n = 0 *)
-          apply bar_app with (v := []).
-          apply IH2 with (x := a); simpl; auto.
-          intros phi.
-          destruct (H (a⋅phi)) as ([ | n] & H3 & H4).
-          - exists 0; simpl in *; auto.
-          - rewrite pfx_rev_S in H3, H4; eauto.
-        * (* Since Γ\a is empty, we use H on the constant function λ _, a *)
-          destruct (H (λ _, a)) as ([ | n ] & H3 & H4).
-          - constructor 1; auto.
-          - rewrite pfx_rev_S in H3.
-            now apply Ha in H3.
     Qed.
 
     (** This lemma is difficult:
@@ -474,6 +481,164 @@ Section af_secure.
       + apply Brouwer'_afS.
       + apply afStump_af.
     Qed.
+
+  End using_Brouwer_thesis'.
+
+  Section bar_secures.
+
+    Variables (P : rel₁ (list X)) (HP : ∀ x l, P l → P (x::l)).
+
+    Local Fact Pmonotonic l r : P r → P (l++r).
+    Proof. induction l; eauto. Qed.
+
+    Definition barS_secures l Γ := ∀φ, ∃n, Γ ⟨φ|n⟩ ∧ P (⟨φ|n⟩++l).
+
+    Lemma Stump_barS_secures_bar l : Stump ⧫ barS_secures l → bar P l.
+    Proof.
+      intros (Γ & H1 & H2); revert H1 H2.
+      induction 1 as [ Γ H1 | Γ H1 H2 IH2 ] in l |- *; intros H.
+      + constructor 2; intros a.
+        now destruct (H (λ _, a)) as (_ & ?%H1 & _).
+      + constructor 2; intros a.
+        (* We use the emptyness of λ l, Γ (l++[a]) to discriminate between n = 0 or not
+           in the ∃n of hypothesis H for any φ starting such that φ 0 = a *)
+        destruct Stump_empty_dec with (1 := H2 a) as [ Ha | Ha ].
+        * (* Γ [a] holds hence we can do something with the case n = 0 *) 
+          apply IH2 with (l := _::_) (x := a).
+          intros phi.
+          destruct (H (a⋅phi)) as ([ | n] & H3 & H4).
+          - exists 0; simpl; auto.
+          - rewrite pfx_rev_S in H3, H4.
+            rewrite app_ass in H4.
+            eauto.
+        * (* Since Γ (_++[a]) → False, we use H on the constant function λ _, a *)
+          destruct (H (λ _, a)) as ([ | n ] & H3 & H4).
+          - constructor 1; auto.
+          - rewrite pfx_rev_S in H3.
+            now apply Ha in H3.
+    Qed.
+
+    Lemma Stump_monotonic_bar Γ : Stump Γ → (∀φ, ∃n, Γ∩₁P ⟨φ|n⟩) → bar P [].
+    Proof.
+      intros H1 H2.
+      apply Stump_barS_secures_bar.
+      exists Γ; split; auto.
+      intros phi.
+      destruct (H2 phi) as (n & []).
+      exists n; split; auto.
+      now rewrite <- app_nil_end.
+    Qed.
+
+    Hypothesis (Pdec : ∀l, P l + ¬ P l).
+
+    Definition bar_secures :=
+    fix loop l ω :=
+      match ω with
+      | leaf   => P l
+      | node ρ => ∀a, loop (a::l) (ρ a)
+      end.
+
+    Fact bar_dec_bar_secures l : bar P l → { ω | bar_secures l ω }.
+    Proof.
+      intros H%bar_Acc; revert l H.
+      refine (fix loop l d { struct d } := _).
+      destruct (Pdec l) as [ Hl | Hl ].
+      + now exists leaf.
+      + exists (node (fun a => proj1_sig (loop (a::l) (@Acc_inv _ _ _ d (a::l) (conj eq_refl Hl))))).
+        simpl; intros a.
+        apply (proj2_sig _).
+    Qed.
+
+    Definition barₛ_secures l ω := ∀φ, P (⟨φ|φ↗ω⟩++l).
+
+    Fact bar_secures_barₛ_secures l ω : bar_secures l ω → barₛ_secures l ω.
+    Proof.
+      induction ω as [ | ρ IH ] in l |- *; intros H phi.
+      + now simpl in *.
+      + simpl WFT_ht; rewrite pfx_rev_S, app_ass.
+        apply IH with (l := _::_), H.
+    Qed.
+
+    Fact barₛ_secures_barS_secures l ω : barₛ_secures l ω → barS_secures l (stump ω⁺¹).
+    Proof.
+      intros H phi.
+      exists phi↗ω.
+      split; auto.
+      apply stump_pfx_rev.
+    Qed.
+
+    Definition suffix l s := exists m, l = m++s.
+
+    Fact bar_app l r : bar P r → bar P (l++r).
+    Proof.
+      induction l; auto; simpl.
+      intro; apply bar_inv_mono; auto.
+    Qed.
+
+    (* We need to capture stump ω⁺¹ where
+        ω is the one computed by 
+         bar_bar_secures P l : bar P l → { ω | bar_secures P l ω } 
+         ie the inductive structure of the bar P l predicate *)
+
+    Definition mks r l :=
+      ~ P (l++r) \/ P (l++r) /\ match l with [] => False | _::l => ~ P (l++r) end.
+
+    Fact mks_nil r : mks r [].
+    Admitted.
+
+    Fact mks_equiv x r l : mks (x::r) l <-> mks r (l++[x]).
+    Admitted.
+
+    Fact bar_mks_Stump r : bar P r → Stump (mks r).
+    Proof.
+      induction 1 as [ r Hr | r Hr IHr ].
+      + constructor 1.
+        intros m [ [] | [H1 H2] ].
+        * now apply Pmonotonic.
+        * destruct m as [ | x m ]; auto.
+          now apply H2, Pmonotonic.
+      + constructor 2.
+        * apply mks_nil.
+        * intros x.
+          generalize (IHr x).
+          apply Stump_ext.
+          intros; apply mks_equiv.
+    Admitted.
+
+    Definition sprefix r m := exists l, l <> [] /\ m = l++r.
+
+    Definition mkStmp l := λ m :=
+      ~ P (m++l) \/ P (m++l) /\ forall p, sprefix p m -> ~ P (p++l).
+
+    Fact bar_mkStump P l : bar P l -> Stump (mkStmp P l).
+    Proof.
+      induction 1 as [ l Hl | l Hl IHl ].
+      + constructor 2.
+        * right; split; auto.
+          now intros p ([] & H1 & H2).
+        * intros a; constructor 1.
+          intros m [ H | [ H1 H2 ] ].
+          - (*monotonicity *) admit.
+          - apply (H2 []); auto.
+            exists (m++[a]); split.
+            ++ now destruct m.
+            ++ now rewrite app_ass.
+      + constructor 2.
+        * (* decide P l \/ ~ P l *) admit.
+        * intros a.
+          specialize (IHl a).
+          revert IHl.
+          apply Stump_ext.
+          intros m; split; unfold mkStmp;
+            intros [ H | (H1 & H2) ].
+          - left; now rewrite app_ass.
+          - right; rewrite app_ass; split; auto.
+            intros p (r & H3 & H4).
+left. split.
+
+      ~ P l \/ P l /\ match l with [] => True | _::l => ~ P l end.
+
+    Fact bar_mkStmp P l : bar P 
 
     (* This one seems difficult to get ... *)
 
@@ -540,8 +705,6 @@ Section af_secure.
           - admit.
         * admit.
     Admitted. 
- 
-  End using_Brouwer_thesis'.
 
   Check Brouwers_alt_Thesis_equivalences.
 
