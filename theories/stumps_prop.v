@@ -370,19 +370,25 @@ Section af_secure.
           intro; apply H.
     Qed.
 
-    Definition Stump_lift Γ l := l = [] ∨ ∃ x l', l = l'++[x] ∧ Γ l'.
+    Definition Stump_lift Γ l :=
+      match l with
+      | []   => True
+      | _::l => Γ l
+      end.
 
     Fact Stump_lift_correct Γ : Stump Γ → Stump (Stump_lift Γ).
     Proof.
-      intros H.
-      constructor 2.
-      + now left.
-      + intros x.
-        revert H; apply Stump_ext.
-        intros l; split.
-        * right; now exists x, l.
-        * intros [ H | (y & m & (<- & <-)%app_inj_tail_iff & H2) ]; auto.
-          now destruct l.
+      induction 1 as  [ Γ H1 | Γ H1 H2 IH2 ].
+      + constructor 2.
+        * now simpl.
+        * intros x.
+          constructor 1.
+          intros []; simpl; apply H1.
+      + constructor 2.
+        * now simpl.
+        * intros x.
+          apply Stump_ext with (2 := IH2 x).
+          intros []; simpl; tauto.
     Qed.
 
     Fact stump_is_Stump ω : Stump (stump ω).
@@ -629,149 +635,29 @@ Section af_secure.
             rewrite !app_ass; auto.
     Qed.
 
+    (* Seem we cannot remove Pwdec as an hypothesis *) 
     Lemma bar_barS_secures l : bar P l → Stump ⧫ barS_secures l.
     Proof.
-      exists (Stump_lift (mks l)); split.
+      intros H; exists (Stump_lift (mks l)); split.
       + now apply Stump_lift_correct, bar_mks_Stump.
-      + intros phi. 
+      + intros phi.
         destruct bar_rec_wdec with (φ := phi) (1 := H)
           as [ Hl | (n & H1 & H2) ].
-        * exists 0; split; auto; left; auto.
-        * exists (S n); split; auto.
-          rewrite pfx_rev_S. 
-          right.
-          exists (phi 0), ⟨↓phi|n⟩; split; auto.
-          red.
-    Admitted.
-           
-          red.
-intros phi.
-        Search bar.
+        * exists 0; simpl; auto.
+        * exists (S n); auto.
+    Qed.
 
-
-    Fact mks_nil r : mks r [].
-    Admitted.
-
-    Fact mks_equiv x r l : mks (x::r) l <-> mks r (l++[x]).
-    Admitted.
-
-    Fact bar_mks_Stump r : bar P r → Stump (mks r).
+    Theorem bar_iff_barS_secures l : bar P l ↔ Stump ⧫ barS_secures l.
     Proof.
-      induction 1 as [ r Hr | r Hr IHr ].
-      + constructor 1.
-        intros m [ [] | [H1 H2] ].
-        * now apply Pmonotonic.
-        * destruct m as [ | x m ]; auto.
-          now apply H2, Pmonotonic.
-      + constructor 2.
-        * apply mks_nil.
-        * intros x.
-          generalize (IHr x).
-          apply Stump_ext.
-          intros; apply mks_equiv.
-    Admitted.
+      split.
+      + apply bar_barS_secures.
+      + apply Stump_barS_secures_bar.
+    Qed.
 
-    Definition sprefix r m := exists l, l <> [] /\ m = l++r.
+  End bar_secures.
 
-    Definition mkStmp l := λ m :=
-      ~ P (m++l) \/ P (m++l) /\ forall p, sprefix p m -> ~ P (p++l).
-
-    Fact bar_mkStump P l : bar P l -> Stump (mkStmp P l).
-    Proof.
-      induction 1 as [ l Hl | l Hl IHl ].
-      + constructor 2.
-        * right; split; auto.
-          now intros p ([] & H1 & H2).
-        * intros a; constructor 1.
-          intros m [ H | [ H1 H2 ] ].
-          - (*monotonicity *) admit.
-          - apply (H2 []); auto.
-            exists (m++[a]); split.
-            ++ now destruct m.
-            ++ now rewrite app_ass.
-      + constructor 2.
-        * (* decide P l \/ ~ P l *) admit.
-        * intros a.
-          specialize (IHl a).
-          revert IHl.
-          apply Stump_ext.
-          intros m; split; unfold mkStmp;
-            intros [ H | (H1 & H2) ].
-          - left; now rewrite app_ass.
-          - right; rewrite app_ass; split; auto.
-            intros p (r & H3 & H4).
-left. split.
-
-      ~ P l \/ P l /\ match l with [] => True | _::l => ~ P l end.
-
-    Fact bar_mkStmp P l : bar P 
-
-    (* This one seems difficult to get ... *)
-
-    Definition make_Stump R l :=
-      match l with
-      | []   => True
-      | x::l => ~ good R l
-      end.
-
-    (* make_Stump (True) l <-> length l <= 2 
-
-       what could be a positive criteria ? *)
-
-    Lemma af_make_Stump R : af R -> (forall x y, R x y \/ ~ R x y) -> Stump (make_Stump R) /\ afS_secures R (make_Stump R).
-    Proof.
-      induction 1 as [ R HR | R HR IHR ]; intros Rdec; split.
-      + constructor 2; simpl; auto.
-        intros x; constructor 2; simpl.
-        1: now intros ?%good_nil_inv.
-        intros y; constructor 2; simpl.
-        1: now intros ?%good_sg_inv.
-        intros z; simpl.
-        constructor 1.
-        intros [ | a l ]; simpl; intros H; apply H.
-        * constructor 1 with x; simpl; auto.
-        * rewrite app_ass; apply good_app_left.
-          constructor 1 with x; simpl; auto.
-      + intros phi; exists 2; split; simpl.
-        * now intros ?%good_sg_inv.
-        * constructor 1 with (phi 0); simpl; auto.
-      + constructor 2; simpl; auto.
-        intros x.
-        destruct (IHR x) as (H1 & H2).
-        * admit.
-        * revert H1.
-          apply Stump_ext.
-          intros [ | z l ]; simpl.
-          Search good app.
-          - rewrite good_nil_inv; tauto.
-          - rewrite good_rel_lift_rev_iff.
-            admit.
-      + intros phi.
-    Admitted.
-
-    Lemma af_afStump R : af R → ∃Γ, Stump Γ ∧ afS_secures R Γ.
-    Proof.
-      induction 1 as [ R HR | R HR IHR ].
-      + exists (stump leaf⁺¹⁺¹⁺¹); split.
-        * apply stump_is_Stump.
-        * intros phi; exists 2; split.
-          - right; exists (phi 0), [phi 1]; split; auto.
-            right; exists (phi 1), []; split; auto.
-            now left.
-          - constructor 1 with (phi 0); simpl; eauto.
-      + exists (fun l => l = [] \/ exists x m, l = m++[x] /\ exists Γ, Stump Γ /\ afS_secures R↑x Γ /\ Γ l); split.
-        * constructor 2; auto.
-          intros x.
-          destruct (IHR x) as (G & H1 & H2).
-          apply Stump_ext with (Γ := λ l, ∃ Γ, Stump Γ ∧ afS_secures R↑x Γ ∧ Γ (l ++ [x])).
-          - intros l; split.
-            ++ right; exists x, l; auto.
-            ++ intros [ C | (y & m & (<- & <-)%app_inj_tail & H) ]; auto.
-               now destruct l.
-          - admit.
-        * admit.
-    Admitted. 
-
+  Check bar_iff_barS_secures.
+ 
   Check Brouwers_alt_Thesis_equivalences.
 
   Section using_Fun_Choice.
