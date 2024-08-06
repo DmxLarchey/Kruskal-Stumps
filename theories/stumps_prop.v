@@ -370,6 +370,21 @@ Section af_secure.
           intro; apply H.
     Qed.
 
+    Definition Stump_lift Γ l := l = [] ∨ ∃ x l', l = l'++[x] ∧ Γ l'.
+
+    Fact Stump_lift_correct Γ : Stump Γ → Stump (Stump_lift Γ).
+    Proof.
+      intros H.
+      constructor 2.
+      + now left.
+      + intros x.
+        revert H; apply Stump_ext.
+        intros l; split.
+        * right; now exists x, l.
+        * intros [ H | (y & m & (<- & <-)%app_inj_tail_iff & H2) ]; auto.
+          now destruct l.
+    Qed.
+
     Fact stump_is_Stump ω : Stump (stump ω).
     Proof. 
       induction ω; simpl; eauto.
@@ -529,7 +544,8 @@ Section af_secure.
       now rewrite <- app_nil_end.
     Qed.
 
-    Hypothesis (Pdec : ∀l, P l + ¬ P l).
+    Hypothesis (Pdec :  ∀l, P l + ¬ P l)
+               (Pwdec : ∀l, P l ∨ ¬ P l).
 
     Definition bar_secures :=
     fix loop l ω :=
@@ -580,8 +596,58 @@ Section af_secure.
          bar_bar_secures P l : bar P l → { ω | bar_secures P l ω } 
          ie the inductive structure of the bar P l predicate *)
 
-    Definition mks r l :=
-      ~ P (l++r) \/ P (l++r) /\ match l with [] => False | _::l => ~ P (l++r) end.
+    Definition mks l m := ~ P (m++l).
+
+    Fact bar_mks_Stump l : bar P l → Stump (mks l).
+    Proof.
+      induction 1 as [ | l Hl IHl ].
+      + constructor 1.
+        intros ? []; now apply Pmonotonic.
+      + destruct (Pwdec l).
+        * constructor 1.
+          intros ? []; now apply Pmonotonic.
+        * constructor 2.
+          - assumption.
+          - intros a.
+            generalize (IHl a).
+            apply Stump_ext.
+            intros m; unfold mks.
+            rewrite app_ass; simpl; tauto.
+    Qed.
+
+    Fact bar_rec_wdec l φ : bar P l → P l ∨ ∃n, ¬ P (⟨φ|n⟩++l) ∧ P (⟨φ|S n⟩++l).
+    Proof.
+      induction 1 as [ l Hl | l _ IHl ] in φ |- *.
+      + now left.
+      + destruct (Pwdec l) as [ Hl | Hl ].
+        * now left.
+        * right.
+          destruct (IHl (φ 0) (↓φ))
+            as [ H | (n & H1 & H2) ].
+          - exists 0; split; auto.
+          - exists (S n); do 2 rewrite pfx_rev_S.
+            rewrite !app_ass; auto.
+    Qed.
+
+    Lemma bar_barS_secures l : bar P l → Stump ⧫ barS_secures l.
+    Proof.
+      exists (Stump_lift (mks l)); split.
+      + now apply Stump_lift_correct, bar_mks_Stump.
+      + intros phi. 
+        destruct bar_rec_wdec with (φ := phi) (1 := H)
+          as [ Hl | (n & H1 & H2) ].
+        * exists 0; split; auto; left; auto.
+        * exists (S n); split; auto.
+          rewrite pfx_rev_S. 
+          right.
+          exists (phi 0), ⟨↓phi|n⟩; split; auto.
+          red.
+    Admitted.
+           
+          red.
+intros phi.
+        Search bar.
+
 
     Fact mks_nil r : mks r [].
     Admitted.
