@@ -621,17 +621,43 @@ Section af_secure.
             rewrite app_ass; simpl; tauto.
     Qed.
 
+    Definition min_ext l e := P (e++l) /\ forall k, P (k++l) -> exists p, k = p++e.
+    Definition mks' l m := exists e, min_ext l e /\ exists p, e = p ++ m.
+
+    Fact bar_min_ext l : bar P l -> ex (min_ext l).
+    Proof.
+      induction 1 as [ l Hl | l Hl IHl ].
+      + exists []; split; auto.
+        intros k Hk; exists k; now rewrite <- app_nil_end.
+    Admitted.
+
+    Fact bar_mks'_Stump l : bar P l → Stump (mks' l).
+    Proof.
+      induction 1 as [ l Hl | l Hl IHl ].
+      + constructor 2.
+        * exists []; split.
+          2: now exists [].
+          split; auto.
+          intros k Hk; exists k; now rewrite <- app_nil_end.
+        * intros x; constructor 1.
+          intros m (e & (H1 & H2) & p & ->).
+          destruct (H2 [] Hl) as (q & Hq).
+          now destruct q; destruct p; destruct m.
+      + constructor 2.
+        * 
+    Admitted.
+
     Fact bar_rec_wdec l φ : bar P l → P l ∨ ∃n, ¬ P (⟨φ|n⟩++l) ∧ P (⟨φ|S n⟩++l).
     Proof.
       induction 1 as [ l Hl | l _ IHl ] in φ |- *.
       + now left.
-      + destruct (Pwdec l) as [ Hl | Hl ].
+      + destruct (Pwdec l).
         * now left.
         * right.
-          destruct (IHl (φ 0) (↓φ))
-            as [ H | (n & H1 & H2) ].
+          destruct (IHl (φ 0) (↓φ)) as [ | (n & []) ].
           - exists 0; split; auto.
-          - exists (S n); do 2 rewrite pfx_rev_S.
+          - exists (S n). 
+            do 2 rewrite pfx_rev_S.
             rewrite !app_ass; auto.
     Qed.
 
@@ -642,7 +668,7 @@ Section af_secure.
       + now apply Stump_lift_correct, bar_mks_Stump.
       + intros phi.
         destruct bar_rec_wdec with (φ := phi) (1 := H)
-          as [ Hl | (n & H1 & H2) ].
+          as [ | (n & []) ].
         * exists 0; simpl; auto.
         * exists (S n); auto.
     Qed.
