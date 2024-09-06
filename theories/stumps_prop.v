@@ -278,6 +278,90 @@ Section af_secure.
     | _::l => l = m
     end.
 
+  Implicit Type P : list X → Prop.
+
+  Notation monotone P := (∀ x l, P l → P (x::l)).
+
+  Inductive mon P : list X → Prop :=
+    | mon_stop l : P l → mon P l
+    | mon_next l x : mon P l → mon P (x::l).
+
+  Fact mon_monotone P : monotone (mon P).
+  Proof. now constructor 2. Qed.
+
+  Inductive sec P : list X → Prop :=
+    | sec_stop l : P l → sec P l
+    | sec_first l : (∀x, sec P (x::l)) → sec P l
+    | sec_second l x : sec P l → sec P (x::l).
+
+  Section mon_sec.
+
+    (* sec is the least monotone and inductive predicate 
+       containing P, canonical "proof" but here proofs
+       are infinite objects ... *)
+
+    Hint Constructors mon sec : core.
+
+    Fact sec_mono (P Q : list X → Prop) : P ⊆₁ Q → sec P ⊆₁ sec Q.
+    Proof. induction 2; eauto. Qed.
+
+    Fact mon_sec P : mon P ⊆₁ sec P.
+    Proof. induction 1; eauto. Qed.
+
+    Fact bar_sec P l : bar P l → sec P l.
+    Proof. induction 1; eauto. Qed.
+
+    Section sec_bar_mono.
+
+      Variables (P : list X → Prop) (Pmono : monotone P).
+
+      Hint Resolve bar_inv_mono : core.
+
+      (* The notions bar and sec are equiv. for monotone P *)
+
+      Fact sec_bar_mono : sec P ⊆₁ bar P.
+      Proof. induction 1; eauto. Qed.
+
+    End sec_bar_mono.
+
+    Fact sec_bar_mon P : sec P ⊆₁ bar (mon P).
+    Proof.
+      intros l Hl.
+      apply sec_bar_mono.
+      + apply mon_monotone.
+      + revert Hl; apply sec_mono.
+        now constructor 1.
+    Qed.
+
+    Hint Resolve mon_sec bar_sec : core.
+
+    Fact bar_mon_sec P : bar (mon P) ⊆₁ sec P.
+    Proof. induction 1; eauto. Qed.
+
+    Fact mon_bar_sec P : mon (bar P) ⊆₁ sec P.
+    Proof. induction 1; eauto. Qed.
+
+    Theorem sec_iff_bar_mon P l : sec P l ↔ bar (mon P) l.
+    Proof.
+      split.
+      + apply sec_bar_mon.
+      + apply bar_mon_sec.
+    Qed.
+
+    (* Brouwers basic assumption: 
+         P is a Bar in nat -> nat then sec P [] 
+ 
+       But if P = good R then P is monotonic
+         hence
+        good R is a bar in nat -> nat then bar (good R) [] 
+
+       Then Ind P := bar P 
+
+
+    *)
+
+  End mon_sec.
+
   Section bar_dec.
 
     Variables (P : list X → Prop) (Pdec : ∀l, P l ∨ ¬ P l). 
@@ -301,6 +385,9 @@ Section af_secure.
     Qed.
 
   End bar_dec.
+
+ 
+  
 
   Section using_Brouwer_thesis'.
 
